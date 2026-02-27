@@ -1,0 +1,48 @@
+# Raspberry Pi servers - group variables
+
+# --- Package manager ---
+pkg_manager: apt
+
+# --- Firewall (iptables/nftables - no firewalld on Debian) ---
+firewall_backend: iptables
+
+# --- Docker container ports to allow from LAN ---
+# These ports are exposed by running containers and must remain accessible
+container_ports:
+  - { port: 3000, proto: tcp, comment: "Homepage" }
+  - { port: 6881, proto: tcp, comment: "qBittorrent" }
+  - { port: 6881, proto: udp, comment: "qBittorrent" }
+  - { port: 8080, proto: tcp, comment: "Speedtest" }
+  - { port: 8096, proto: tcp, comment: "Jellyfin" }
+  - { port: 8123, proto: tcp, comment: "Home Assistant" }
+  - { port: 8443, proto: tcp, comment: "Speedtest HTTPS" }
+  - { port: 9000, proto: tcp, comment: "Portainer" }
+  - { port: 6600, proto: tcp, comment: "MPD" }
+  - { port: 9865, proto: tcp, comment: "qBittorrent web" }
+
+# --- Ports to allow from any source (internet-facing services) ---
+# These ports are exposed to the internet via router port forwarding
+internet_ports:
+  - { port: 1194, proto: udp, comment: "OpenVPN" }
+
+# --- OpenVPN ---
+openvpn_subnet: "{{ vault_openvpn_subnet }}"
+openvpn_out_iface: "eth0"
+
+# --- Services to disable ---
+services_to_disable:
+  - avahi-daemon
+  - bluetooth
+
+# --- Kernel boot params (cmdline.txt for RPi) ---
+rpi_cmdline_extra: "audit=1"
+
+# --- AIDE configuration ---
+aide_checksum: sha256
+aide_exclude_paths: "{{ ['/var/lib/docker', '/var/lib/containerd', '/qbittorrent'] + vault_nas_mounts }}"
+
+# --- Additional sysctl for servers running Docker ---
+sysctl_extra:
+  # Docker requires IP forwarding - do not disable
+  net.ipv4.ip_forward: 1
+  net.ipv6.conf.all.forwarding: 1

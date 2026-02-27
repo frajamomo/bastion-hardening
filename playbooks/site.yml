@@ -1,0 +1,4 @@
+---
+# Master Playbook - Bootstrap + Full Hardening
+- import_playbook: bootstrap.yml
+- import_playbook: harden.yml

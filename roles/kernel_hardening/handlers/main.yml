@@ -1,0 +1,7 @@
+---
+- name: Apply sysctl settings
+  ansible.builtin.command: sysctl -p /etc/sysctl.d/99-hardening.conf
+
+- name: Regenerate GRUB config
+  ansible.builtin.command: grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg
+  when: ansible_os_family == 'RedHat'

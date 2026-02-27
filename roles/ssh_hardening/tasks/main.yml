@@ -1,0 +1,48 @@
+---
+# Phase 1: SSH Hardening (Fedora + Debian)
+
+- name: Remove old 99-hardening sshd config if present
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/99-hardening.conf
+    state: absent
+  notify: Restart sshd
+
+- name: Deploy hardened sshd configuration
+  ansible.builtin.template:
+    src: 10-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart sshd
+
+- name: Ensure sshd_config includes config.d directory
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*Include\s+'
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    state: present
+  notify: Restart sshd
+
+- name: Remove weak host keys (DSA, ECDSA)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/ssh/ssh_host_dsa_key
+    - /etc/ssh/ssh_host_dsa_key.pub
+    - /etc/ssh/ssh_host_ecdsa_key
+    - /etc/ssh/ssh_host_ecdsa_key.pub
+  notify: Restart sshd
+
+- name: Ensure Ed25519 host key exists
+  ansible.builtin.command: ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
+  args:
+    creates: /etc/ssh/ssh_host_ed25519_key
+
+- name: Set correct permissions on SSH host keys
+  ansible.builtin.file:
+    path: /etc/ssh/ssh_host_ed25519_key
+    owner: root
+    group: root
+    mode: "0600"

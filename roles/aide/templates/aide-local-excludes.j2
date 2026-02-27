@@ -1,0 +1,5 @@
+# Local AIDE exclusions - Managed by Ansible
+# This file must sort AFTER 99_aide_root to override the catch-all rule
+{% for path in aide_exclude_paths %}
+!{{ path }}
+{% endfor %}

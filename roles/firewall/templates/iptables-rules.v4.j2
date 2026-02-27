@@ -1,0 +1,56 @@
+# IPv4 Firewall Rules - Managed by Ansible
+# Do not edit manually
+#
+# NOTE: Only the INPUT chain is managed here.
+# The FORWARD and DOCKER chains are managed by Docker and must not be touched.
+
+*filter
+:INPUT DROP [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# Allow loopback
+-A INPUT -i lo -j ACCEPT
+
+# Allow established and related connections
+-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# Allow SSH from trusted subnet only
+-A INPUT -s {{ trusted_subnet }} -p tcp --dport {{ ssh_port }} -j ACCEPT
+
+# Allow container service ports from trusted subnet
+{% for entry in container_ports %}
+-A INPUT -s {{ trusted_subnet }} -p {{ entry.proto }} --dport {{ entry.port }} -j ACCEPT -m comment --comment "{{ entry.comment }}"
+{% endfor %}
+
+# Allow internet-facing service ports from any source
+{% for entry in internet_ports | default([]) %}
+-A INPUT -p {{ entry.proto }} --dport {{ entry.port }} -j ACCEPT -m comment --comment "{{ entry.comment }}"
+{% endfor %}
+
+# Allow VPN clients to reach the host
+{% if openvpn_subnet is defined %}
+-A INPUT -s {{ openvpn_subnet }} -j ACCEPT -m comment --comment "OpenVPN clients"
+{% endif %}
+
+# Allow ICMP (ping) from trusted subnet only
+-A INPUT -s {{ trusted_subnet }} -p icmp --icmp-type echo-request -j ACCEPT
+
+# Allow Docker bridge networks (container-to-host communication)
+-A INPUT -i br-+ -j ACCEPT
+-A INPUT -i docker0 -j ACCEPT
+
+# Log and drop everything else
+-A INPUT -m limit --limit 5/min -j LOG --log-prefix "iptables-dropped: " --log-level 4
+-A INPUT -j DROP
+
+COMMIT
+
+{% if openvpn_subnet is defined %}
+# NAT for OpenVPN clients to access LAN
+# NOTE: Docker manages its own NAT rules at runtime; only VPN masquerade here
+*nat
+:POSTROUTING ACCEPT [0:0]
+-A POSTROUTING -s {{ openvpn_subnet }} -o {{ openvpn_out_iface | default('eth0') }} -j MASQUERADE -m comment --comment "OpenVPN clients to LAN"
+COMMIT
+{% endif %}

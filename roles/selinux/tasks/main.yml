@@ -1,0 +1,33 @@
+---
+# Phase 4: SELinux / AppArmor
+# SELinux on Fedora, skip on Debian (AppArmor not active on this RPi)
+
+- name: Ensure SELinux is in enforcing mode
+  ansible.posix.selinux:
+    policy: targeted
+    state: enforcing
+  when: ansible_os_family == 'RedHat'
+
+- name: Update SELinux policy packages
+  ansible.builtin.dnf:
+    name:
+      - selinux-policy
+      - selinux-policy-targeted
+    state: latest
+  when: ansible_os_family == 'RedHat'
+
+- name: Check for SELinux denials
+  ansible.builtin.command: ausearch -m AVC -ts recent
+  register: selinux_denials
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == 'RedHat'
+
+- name: Report SELinux denials if any
+  ansible.builtin.debug:
+    msg: "SELinux denials found - review with: ausearch -m AVC -ts recent | audit2why"
+  when:
+    - ansible_os_family == 'RedHat'
+    - selinux_denials.rc is defined
+    - selinux_denials.rc == 0
+    - selinux_denials.stdout | length > 0

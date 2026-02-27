@@ -1,0 +1,21 @@
+# IPv6 Firewall Rules - Managed by Ansible
+# Do not edit manually
+
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# Allow loopback
+-A INPUT -i lo -j ACCEPT
+
+# Allow established and related connections
+-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# Allow ICMPv6 (needed for IPv6 to function)
+-A INPUT -p ipv6-icmp -j ACCEPT
+
+# Drop everything else
+-A INPUT -j DROP
+
+COMMIT

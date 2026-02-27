@@ -1,0 +1,11 @@
+---
+# Phase 2: Firewall Hardening
+# Dispatches to firewalld (Fedora) or iptables (Debian)
+
+- name: Include firewalld tasks (Fedora)
+  ansible.builtin.include_tasks: firewalld.yml
+  when: firewall_backend == 'firewalld'
+
+- name: Include iptables tasks (Debian)
+  ansible.builtin.include_tasks: iptables.yml
+  when: firewall_backend == 'iptables'

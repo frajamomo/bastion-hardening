@@ -1,0 +1,5 @@
+---
+- name: Restart sshd
+  ansible.builtin.shell: >
+    sshd -t &&
+    systemctl restart {{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}

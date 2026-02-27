@@ -1,0 +1,145 @@
+---
+# Phase 10: Additional Hardening
+
+- name: Disable unnecessary services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ services_to_disable }}"
+  ignore_errors: true
+
+- name: Set shell timeout for idle sessions
+  ansible.builtin.lineinfile:
+    path: /etc/profile.d/99-hardening.sh
+    line: "{{ item }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - "# Security hardening - Managed by Ansible"
+    - "readonly TMOUT={{ shell_tmout }}"
+    - "export TMOUT"
+
+- name: Restrict cron access to root only
+  ansible.builtin.copy:
+    content: "root\n"
+    dest: /etc/cron.allow
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Restrict at access to root only
+  ansible.builtin.copy:
+    content: "root\n"
+    dest: /etc/at.allow
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Check if cron directories exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/cron.d
+    - /etc/cron.daily
+    - /etc/cron.hourly
+    - /etc/cron.weekly
+    - /etc/cron.monthly
+  register: cron_dirs
+
+- name: Ensure permissions on cron directories (if they exist)
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    owner: root
+    group: root
+    mode: "0700"
+  loop: "{{ cron_dirs.results }}"
+  when: item.stat.exists
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Check if crontab exists
+  ansible.builtin.stat:
+    path: /etc/crontab
+  register: crontab_file
+
+- name: Set secure permissions on /etc/crontab (if it exists)
+  ansible.builtin.file:
+    path: /etc/crontab
+    owner: root
+    group: root
+    mode: "0600"
+  when: crontab_file.stat.exists
+
+- name: Configure password quality requirements (Fedora)
+  ansible.builtin.lineinfile:
+    path: /etc/security/pwquality.conf
+    regexp: "^{{ item.key }}"
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: "minlen", value: "14" }
+    - { key: "dcredit", value: "-1" }
+    - { key: "ucredit", value: "-1" }
+    - { key: "ocredit", value: "-1" }
+    - { key: "lcredit", value: "-1" }
+    - { key: "minclass", value: "3" }
+    - { key: "maxrepeat", value: "3" }
+  when: ansible_os_family == 'RedHat'
+
+- name: Install password quality tools (Debian)
+  ansible.builtin.apt:
+    name: libpam-pwquality
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Configure password quality requirements (Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/security/pwquality.conf
+    regexp: "^#?\\s*{{ item.key }}"
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: "minlen", value: "14" }
+    - { key: "dcredit", value: "-1" }
+    - { key: "ucredit", value: "-1" }
+    - { key: "ocredit", value: "-1" }
+    - { key: "lcredit", value: "-1" }
+    - { key: "minclass", value: "3" }
+    - { key: "maxrepeat", value: "3" }
+  when: ansible_os_family == 'Debian'
+
+- name: Restrict access to su command
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/su
+    regexp: '^#?\s*auth\s+required\s+pam_wheel.so'
+    line: "auth           required        pam_wheel.so use_uid"
+    state: present
+
+- name: Ensure {{ vault_user }} is in wheel/sudo group
+  ansible.builtin.user:
+    name: "{{ vault_user }}"
+    groups: "{{ 'wheel' if ansible_os_family == 'RedHat' else 'sudo' }}"
+    append: true
+
+- name: Set secure permissions on home directory
+  ansible.builtin.file:
+    path: "/home/{{ vault_user }}"
+    mode: "0700"
+
+- name: Install security scanning tools (Fedora)
+  ansible.builtin.dnf:
+    name:
+      - lynis
+      - rkhunter
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install security scanning tools (Debian)
+  ansible.builtin.apt:
+    name:
+      - lynis
+      - rkhunter
+      - chkrootkit
+    state: present
+  when: ansible_os_family == 'Debian'

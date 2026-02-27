@@ -1,0 +1,58 @@
+# Shared variables for all hosts
+
+# --- SSH ---
+ssh_port: 22
+ssh_allowed_users: "{{ vault_user }}"
+ssh_max_auth_tries: 3
+ssh_login_grace_time: 30
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 0
+
+# --- Network ---
+trusted_subnet: "{{ vault_trusted_subnet }}"
+
+# --- Fail2ban ---
+fail2ban_ssh_maxretry: 3
+fail2ban_ssh_findtime: "10m"
+fail2ban_ssh_bantime: "1h"
+fail2ban_ignoreip: "127.0.0.1/8 ::1 {{ vault_trusted_subnet }}"
+
+# --- AIDE defaults ---
+aide_checksum: sha256
+aide_exclude_paths: []
+
+# --- Shell timeout ---
+shell_tmout: 900
+
+# --- Kernel hardening (common across architectures) ---
+sysctl_hardening:
+  # Kernel self-protection
+  kernel.kptr_restrict: 2
+  kernel.dmesg_restrict: 1
+  kernel.unprivileged_bpf_disabled: 1
+  kernel.sysrq: 4
+  kernel.perf_event_paranoid: 3
+  # Network stack
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.conf.default.rp_filter: 1
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv6.conf.all.accept_redirects: 0
+  net.ipv6.conf.default.accept_redirects: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.default.send_redirects: 0
+  net.ipv4.conf.all.accept_source_route: 0
+  net.ipv4.conf.default.accept_source_route: 0
+  net.ipv6.conf.all.accept_source_route: 0
+  net.ipv6.conf.default.accept_source_route: 0
+  net.ipv4.tcp_syncookies: 1
+  net.ipv4.conf.all.log_martians: 1
+  net.ipv4.conf.default.log_martians: 1
+  net.ipv4.icmp_echo_ignore_broadcasts: 1
+  net.ipv4.icmp_ignore_bogus_error_responses: 1
+  # Filesystem
+  fs.protected_symlinks: 1
+  fs.protected_hardlinks: 1
+  fs.protected_fifos: 2
+  fs.protected_regular: 2
+  fs.suid_dumpable: 0

@@ -1,0 +1,8 @@
+*.retry
+*.pyc
+__pycache__/
+.vagrant/
+*.log
+
+# Ansible vault (encrypted secrets)
+inventory/group_vars/all/vault.yml

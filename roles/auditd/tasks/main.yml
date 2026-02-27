@@ -1,0 +1,50 @@
+---
+# Phase 6: Audit Framework (auditd)
+
+- name: Install audit packages (Fedora)
+  ansible.builtin.dnf:
+    name:
+      - audit
+      - audit-libs
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install audit packages (Debian)
+  ansible.builtin.apt:
+    name:
+      - auditd
+      - audispd-plugins
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+
+- name: Deploy hardened audit rules
+  ansible.builtin.template:
+    src: hardening.rules.j2
+    dest: /etc/audit/rules.d/hardening.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Load audit rules
+
+- name: Configure auditd for enriched logging
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^{{ item.key }}\\s*="
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: "log_format", value: "ENRICHED" }
+    - { key: "max_log_file", value: "50" }
+    - { key: "max_log_file_action", value: "rotate" }
+    - { key: "num_logs", value: "10" }
+    - { key: "space_left_action", value: "email" }
+    - { key: "admin_space_left_action", value: "halt" }
+    - { key: "disk_full_action", value: "halt" }
+    - { key: "disk_error_action", value: "halt" }
+  notify: Restart auditd
+
+- name: Ensure auditd is enabled and running
+  ansible.builtin.systemd:
+    name: auditd
+    state: started
+    enabled: true

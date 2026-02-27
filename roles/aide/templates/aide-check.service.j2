@@ -1,0 +1,9 @@
+# AIDE Daily Check - Managed by Ansible
+[Unit]
+Description=AIDE File Integrity Check
+
+[Service]
+Type=oneshot
+ExecStart={{ '/usr/sbin/aide' if ansible_os_family == 'RedHat' else '/usr/bin/aide' }} {{ '' if ansible_os_family == 'RedHat' else '--config /etc/aide/aide.conf ' }}--check
+Nice=19
+IOSchedulingClass=idle

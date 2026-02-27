@@ -1,0 +1,35 @@
+---
+# Bastion Hardening Playbook - All Phases
+# Run against all hosts:     ansible-playbook playbooks/harden.yml
+# Run against one host:      ansible-playbook playbooks/harden.yml --limit raspberrypi
+# Run individual phases:     ansible-playbook playbooks/harden.yml --tags ssh,firewall
+
+- name: Harden bastion hosts
+  hosts: all
+  roles:
+    - role: ssh_hardening
+      tags: ssh
+
+    - role: firewall
+      tags: firewall
+
+    - role: kernel_hardening
+      tags: kernel
+
+    - role: selinux
+      tags: selinux
+
+    - role: fail2ban
+      tags: fail2ban
+
+    - role: auditd
+      tags: auditd
+
+    - role: auto_updates
+      tags: auto_updates
+
+    - role: aide
+      tags: aide
+
+    - role: additional_hardening
+      tags: additional

@@ -1,0 +1,9 @@
+---
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload
+
+- name: Restore iptables rules
+  ansible.builtin.command: netfilter-persistent reload
+
+- name: Restore ip6tables rules
+  ansible.builtin.command: netfilter-persistent reload

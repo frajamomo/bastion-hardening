@@ -1,0 +1,38 @@
+---
+# Phase 8: USB Device Control (USBGuard)
+
+- name: Install USBGuard (Fedora)
+  ansible.builtin.dnf:
+    name: usbguard
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install USBGuard (Debian)
+  ansible.builtin.apt:
+    name: usbguard
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+
+- name: Check if USBGuard policy exists
+  ansible.builtin.stat:
+    path: /etc/usbguard/rules.conf
+  register: usbguard_rules
+
+- name: Generate initial USBGuard policy from connected devices
+  ansible.builtin.shell: usbguard generate-policy > /etc/usbguard/rules.conf
+  when: not usbguard_rules.stat.exists or usbguard_rules.stat.size == 0
+  notify: Restart USBGuard
+
+- name: Set correct permissions on USBGuard rules
+  ansible.builtin.file:
+    path: /etc/usbguard/rules.conf
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Enable and start USBGuard
+  ansible.builtin.systemd:
+    name: usbguard
+    state: started
+    enabled: true

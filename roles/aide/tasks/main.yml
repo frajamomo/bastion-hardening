@@ -1,0 +1,117 @@
+---
+# Phase 9: File Integrity Monitoring (AIDE)
+
+- name: Install AIDE (Fedora)
+  ansible.builtin.dnf:
+    name: aide
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install AIDE (Debian)
+  ansible.builtin.apt:
+    name: aide
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+
+- name: Configure AIDE checksum algorithm (Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/aide/aide.conf
+    regexp: '^Checksums\s*='
+    line: "Checksums = {{ aide_checksum }}"
+  when: ansible_os_family == 'Debian'
+
+- name: Deploy AIDE local exclusions (Debian)
+  ansible.builtin.template:
+    src: aide-local-excludes.j2
+    dest: /etc/aide/aide.conf.d/99_aide_zz_local_excludes
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - ansible_os_family == 'Debian'
+    - aide_exclude_paths | length > 0
+
+- name: Determine AIDE database path
+  ansible.builtin.set_fact:
+    aide_db_path: "{{ '/var/lib/aide/aide.db.gz' if ansible_os_family == 'RedHat' else '/var/lib/aide/aide.db' }}"
+    aide_db_new_path: "{{ '/var/lib/aide/aide.db.new.gz' if ansible_os_family == 'RedHat' else '/var/lib/aide/aide.db.new' }}"
+
+- name: Check if AIDE database exists and is valid
+  ansible.builtin.stat:
+    path: "{{ aide_db_path }}"
+  register: aide_db
+
+- name: Set AIDE needs init fact
+  ansible.builtin.set_fact:
+    aide_needs_init: "{{ not aide_db.stat.exists or aide_db.stat.size == 0 }}"
+
+- name: Remove empty AIDE database if present
+  ansible.builtin.file:
+    path: "{{ aide_db_path }}"
+    state: absent
+  when: aide_db.stat.exists and aide_db.stat.size == 0
+
+- name: Initialize AIDE database (Fedora)
+  ansible.builtin.command: aide --init
+  when:
+    - aide_needs_init | bool
+    - ansible_os_family == 'RedHat'
+  register: aide_init_fedora
+
+- name: Initialize AIDE database (Debian)
+  ansible.builtin.command: aide --config /etc/aide/aide.conf --init
+  register: aide_init_debian
+  failed_when: aide_init_debian.rc not in [0, 14, 15, 17, 18, 21]
+  when:
+    - aide_needs_init | bool
+    - ansible_os_family == 'Debian'
+
+- name: Move new AIDE database into place (Fedora)
+  ansible.builtin.copy:
+    src: "{{ aide_db_new_path }}"
+    dest: "{{ aide_db_path }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - aide_needs_init | bool
+    - ansible_os_family == 'RedHat'
+
+- name: Move new AIDE database into place (Debian)
+  ansible.builtin.copy:
+    src: "{{ aide_db_new_path }}"
+    dest: "{{ aide_db_path }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - aide_needs_init | bool
+    - ansible_os_family == 'Debian'
+    - aide_init_debian is changed or aide_init_debian.rc is defined
+
+- name: Deploy AIDE daily check systemd service
+  ansible.builtin.template:
+    src: aide-check.service.j2
+    dest: /etc/systemd/system/aide-check.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy AIDE daily check systemd timer
+  ansible.builtin.template:
+    src: aide-check.timer.j2
+    dest: /etc/systemd/system/aide-check.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Enable AIDE timer
+
+- name: Enable AIDE timer
+  ansible.builtin.systemd:
+    name: aide-check.timer
+    state: started
+    enabled: true
+    daemon_reload: true

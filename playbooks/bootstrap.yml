@@ -1,0 +1,7 @@
+---
+# Phase 0: Bootstrap - Validate connectivity and gather facts
+- name: Bootstrap bastion targets
+  hosts: all
+  tags: bootstrap
+  roles:
+    - bootstrap

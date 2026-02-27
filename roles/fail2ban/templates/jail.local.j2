@@ -1,0 +1,38 @@
+# Fail2ban Configuration - Managed by Ansible
+# Do not edit manually
+
+[DEFAULT]
+bantime = 1h
+bantime.increment = true
+bantime.factor = 2
+bantime.maxtime = 1w
+findtime = 15m
+maxretry = 5
+{% if ansible_os_family == 'RedHat' %}
+banaction = firewallcmd-rich-rules[actiontype=<multiport>]
+banaction_allports = firewallcmd-rich-rules[actiontype=<allports>]
+{% else %}
+banaction = iptables-multiport
+banaction_allports = iptables-allports
+{% endif %}
+backend = systemd
+ignoreip = {{ fail2ban_ignoreip }}
+
+[sshd]
+enabled = true
+port = {{ ssh_port }}
+maxretry = {{ fail2ban_ssh_maxretry }}
+findtime = {{ fail2ban_ssh_findtime }}
+bantime = {{ fail2ban_ssh_bantime }}
+
+[recidive]
+enabled = true
+logpath = /var/log/fail2ban.log
+{% if ansible_os_family == 'RedHat' %}
+banaction = firewallcmd-rich-rules[actiontype=<allports>]
+{% else %}
+banaction = iptables-allports
+{% endif %}
+bantime = 1w
+findtime = 1d
+maxretry = 5

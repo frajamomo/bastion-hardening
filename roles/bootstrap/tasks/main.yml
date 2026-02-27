@@ -1,0 +1,36 @@
+---
+# Phase 0: Bootstrap - Validate connectivity and gather facts
+
+- name: Gather system facts
+  ansible.builtin.setup:
+    gather_subset:
+      - all
+
+- name: Display target system information
+  ansible.builtin.debug:
+    msg:
+      - "Hostname: {{ ansible_hostname }}"
+      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "Kernel: {{ ansible_kernel }}"
+      - "Architecture: {{ ansible_architecture }}"
+      - "CPU: {{ ansible_processor[2] | default('unknown') }}"
+      - "Memory: {{ ansible_memtotal_mb }} MB"
+      - "SELinux: {{ ansible_selinux.status | default('unknown') }} / {{ ansible_selinux.mode | default('unknown') }}"
+      - "IPv4: {{ ansible_default_ipv4.address | default('unknown') }}"
+
+- name: Check if SSH key authentication is working
+  ansible.builtin.command: echo "SSH key auth confirmed"
+  changed_when: false
+
+- name: Verify sudo access
+  ansible.builtin.command: whoami
+  become: true
+  changed_when: false
+  register: sudo_check
+
+- name: Confirm sudo works as root
+  ansible.builtin.assert:
+    that:
+      - sudo_check.stdout == "root"
+    fail_msg: "Sudo escalation failed"
+    success_msg: "Sudo escalation to root confirmed"

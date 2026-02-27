@@ -1,0 +1,67 @@
+---
+# Firewall hardening for Fedora (firewalld)
+
+- name: Ensure firewalld is installed and running
+  ansible.builtin.systemd:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Set default zone to {{ firewall_default_zone }}
+  ansible.builtin.command: firewall-cmd --set-default-zone={{ firewall_default_zone }}
+  register: zone_result
+  changed_when: "'ZONE_ALREADY_SET' not in zone_result.stderr"
+
+- name: Remove unnecessary services from default zone
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    state: disabled
+    permanent: true
+    immediate: true
+  loop: "{{ firewall_remove_services }}"
+  ignore_errors: true
+
+- name: Remove wide-open port ranges (FedoraWorkstation defaults)
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    state: disabled
+    permanent: true
+    immediate: true
+    zone: "{{ firewall_default_zone }}"
+  loop:
+    - 1025-65535/tcp
+    - 1025-65535/udp
+  ignore_errors: true
+
+- name: Allow SSH only from trusted subnet
+  ansible.posix.firewalld:
+    rich_rule: 'rule family="ipv4" source address="{{ trusted_subnet }}" service name="ssh" accept'
+    state: enabled
+    permanent: true
+    immediate: true
+    zone: "{{ firewall_default_zone }}"
+
+- name: Remove global SSH service (replaced by subnet-restricted rich rule)
+  ansible.posix.firewalld:
+    service: ssh
+    state: disabled
+    permanent: true
+    immediate: true
+    zone: "{{ firewall_default_zone }}"
+
+- name: Enable logging of denied packets
+  ansible.builtin.command: firewall-cmd --set-log-denied=all
+  register: log_result
+  changed_when: "'success' in log_result.stdout"
+
+- name: Block ICMP echo requests from outside trusted subnet
+  ansible.posix.firewalld:
+    icmp_block: echo-request
+    state: enabled
+    permanent: true
+    immediate: true
+    zone: "{{ firewall_default_zone }}"
+
+- name: Reload firewalld to apply all changes
+  ansible.builtin.command: firewall-cmd --reload
+  changed_when: true

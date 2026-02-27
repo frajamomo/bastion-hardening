@@ -1,0 +1,62 @@
+---
+# Phase 3: Kernel Hardening (sysctl + boot params)
+
+- name: Deploy kernel hardening sysctl configuration
+  ansible.builtin.template:
+    src: 99-hardening.conf.j2
+    dest: /etc/sysctl.d/99-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl settings
+
+- name: Disable core dumps via limits.conf
+  ansible.builtin.lineinfile:
+    path: /etc/security/limits.d/99-hardening.conf
+    line: "* hard core 0"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+
+# GRUB boot params (Fedora only)
+- name: Read current GRUB configuration
+  ansible.builtin.slurp:
+    src: /etc/default/grub
+  register: grub_current
+  when: ansible_os_family == 'RedHat'
+
+- name: Add hardening parameters to GRUB_CMDLINE_LINUX
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: 'GRUB_CMDLINE_LINUX="{{ grub_current_cmdline }} {{ grub_cmdline_extra }}"'
+    backup: true
+  vars:
+    grub_current_cmdline: "{{ (grub_current.content | b64decode | regex_search('GRUB_CMDLINE_LINUX=\"([^\"]*)\"', '\\1'))[0] | default('') }}"
+  when:
+    - ansible_os_family == 'RedHat'
+    - grub_cmdline_extra is defined
+    - grub_cmdline_extra not in (grub_current.content | b64decode)
+  notify: Regenerate GRUB config
+
+# RPi boot params (Debian/Raspbian only)
+- name: Check if audit param already in cmdline.txt
+  ansible.builtin.command: grep -c 'audit=1' /boot/firmware/cmdline.txt
+  register: audit_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_os_family == 'Debian'
+    - rpi_cmdline_extra is defined
+    - ansible_architecture == 'aarch64'
+
+- name: Add audit param to RPi cmdline.txt
+  ansible.builtin.shell: >
+    sed -i 's/$/ {{ rpi_cmdline_extra }}/' /boot/firmware/cmdline.txt
+  when:
+    - ansible_os_family == 'Debian'
+    - rpi_cmdline_extra is defined
+    - ansible_architecture == 'aarch64'
+    - audit_check.stdout is defined
+    - audit_check.stdout | int == 0
