@@ -1,0 +1,31 @@
+# Fedora servers - group variables
+
+# --- Package manager ---
+pkg_manager: dnf
+
+# --- Firewall (firewalld) ---
+firewall_backend: firewalld
+firewall_default_zone: "public"
+firewall_allowed_services:
+  - ssh
+firewall_remove_services:
+  - mdns
+  - dhcpv6-client
+  - samba-client
+
+# --- Kernel boot params (GRUB) ---
+grub_cmdline_extra: "audit=1 init_on_alloc=1 init_on_free=1 slab_nomerge lockdown=confidentiality"
+
+# --- Sysctl keys only available on x86_64 / Fedora kernels ---
+sysctl_extra:
+  kernel.yama.ptrace_scope: 2
+  kernel.kexec_load_disabled: 1
+  net.core.bpf_jit_harden: 2
+
+# --- Services to disable ---
+services_to_disable:
+  - avahi-daemon
+  - cups
+
+# --- Power management (server - never suspend) ---
+disable_suspend: true
